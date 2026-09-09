@@ -1,0 +1,60 @@
+# DRISHTI-X — EfficientNet-B0 Training Configuration
+# Run: python training/train_efficientnet.py --config training/configs/train_config.yaml
+
+model:
+  architecture: efficientnet_b0
+  pretrained: true
+  num_classes: 5
+  dropout: 0.3
+  image_size: 224
+
+dataset:
+  # Set path to your dataset root
+  # Supported: APTOS 2019, IDRiD, Messidor-2
+  train_csv: "datasets/aptos2019/train.csv"
+  val_csv: "datasets/aptos2019/val.csv"
+  test_csv: "datasets/aptos2019/test.csv"
+  image_col: "id_code"        # column name for image filename
+  label_col: "diagnosis"      # column name for DR grade (0-4)
+  image_dir: "datasets/aptos2019/train_images"
+  num_workers: 4
+
+training:
+  epochs: 50
+  batch_size: 16
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-5
+  early_stopping_patience: 7
+  lr_scheduler: cosine        # cosine | step | plateau
+  warmup_epochs: 3
+
+loss:
+  type: weighted_cross_entropy  # weighted_cross_entropy | focal
+  # Class weights will be computed automatically from dataset
+  # focal_gamma: 2.0            # Only used if type: focal
+
+augmentation:
+  train:
+    - RandomHorizontalFlip
+    - RandomVerticalFlip
+    - RandomRotation: 15
+    - ColorJitter:
+        brightness: 0.2
+        contrast: 0.2
+        saturation: 0.1
+    - RandomResizedCrop: 224
+  val:
+    - Resize: 224
+    - CenterCrop: 224
+
+checkpointing:
+  save_dir: "models/weights"
+  save_best_only: true
+  metric: val_f1              # val_loss | val_f1 | val_auc
+
+logging:
+  log_dir: "training/logs"
+  log_interval: 10            # batches
+
+reproducibility:
+  seed: 42
