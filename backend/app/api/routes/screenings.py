@@ -338,6 +338,8 @@ async def analyze_screening(
         "mismatch_detected": result.get("mismatch_detected", False),
         "referral_priority": result.get("referral_priority"),
         "referral_score": result.get("referral_score"),
+        "calibrated": result.get("calibrated"),
+        "temperature": result.get("temperature"),
         "warnings": result.get("warnings", []),
         "errors": result.get("errors", []),
     }
