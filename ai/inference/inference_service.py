@@ -16,6 +16,7 @@ from pathlib import Path
 from ai.quality.quality_engine import assess_image_quality, validate_image_file
 from ai.classification.preprocessing import preprocess_fundus, get_inference_tensor
 from ai.classification.model import get_model_loader, DR_GRADE_LABELS, REFERABLE_GRADES
+from ai.classification.calibration import TemperatureScaler
 from ai.explainability.gradcam import generate_and_save_gradcam
 from ai.evidence.lesion_evidence import analyze_lesions
 from ai.assurance.assurance_engine import run_assurance_engine
@@ -34,6 +35,18 @@ class InferenceService:
         self.upload_dir = upload_dir
         self.loader = get_model_loader(weights_path=weights_path)
         self.device = self.loader.device
+
+        # Load calibration if available
+        calibration_path = os.path.join(
+            os.path.dirname(weights_path or "models/weights/best_model.pth"),
+            "temperature.json"
+        )
+        self.calibrator = TemperatureScaler.load_or_default(calibration_path)
+        if self.calibrator._fitted and self.calibrator.temperature != 1.0:
+            print(f"[InferenceService] Calibration loaded: T={self.calibrator.temperature:.4f}")
+        else:
+            print("[InferenceService] No calibration — using raw softmax")
+
         print(self.loader.get_status_banner())
 
     def run_full_pipeline(
@@ -59,6 +72,8 @@ class InferenceService:
             "weights_hash": self.loader.weights_hash,
             "training_dataset": self.loader.training_dataset,
             "is_demo": not self.loader.is_ready_for_real_inference(),
+            "calibrated": self.calibrator._fitted,
+            "temperature": round(self.calibrator.temperature, 4),
             "warnings": [],
             "errors": [],
         }
@@ -122,13 +137,14 @@ class InferenceService:
         # Real model inference
         try:
             tensor = get_inference_tensor(image_path, target_size=224)
-            tensor = tensor.to(self.device)
+            tensor = tensor.to(self.device)   # ensure same device as model
 
             self.loader.model.eval()
             with torch.no_grad():
                 logits = self.loader.model(tensor)
 
-            probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+            # Apply temperature calibration
+            probs = self.calibrator.calibrate(logits)[0].cpu().numpy()
             predicted_grade = int(np.argmax(probs))
             confidence = float(probs[predicted_grade])
             probabilities = {str(i): round(float(p), 4) for i, p in enumerate(probs)}

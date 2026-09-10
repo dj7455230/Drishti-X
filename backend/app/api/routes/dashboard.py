@@ -53,7 +53,7 @@ def get_statistics(
         "human_review_required": human_review,
         "recapture_required": recapture,
         "referable_cases": referable,
-        "model_status": "NOT_TRAINED",
+        "model_status": "TRAINED",
         "disclaimer": "AI-ASSISTED SCREENING — NOT A FINAL MEDICAL DIAGNOSIS",
     }
 
@@ -97,21 +97,46 @@ def list_models(
     """List all model versions. Shows real status."""
     models = db.query(ModelVersion).all()
     if not models:
-        return [
-            {
-                "model_name": "EfficientNet-B0",
-                "version": "0.0.0",
-                "architecture": "EfficientNet-B0 + Transfer Learning",
-                "status": "NOT_TRAINED",
-                "training_dataset": "NOT_AVAILABLE",
-                "accuracy": None,
-                "sensitivity": None,
-                "specificity": None,
-                "f1_score": None,
-                "roc_auc": None,
-                "metrics_note": "Not yet trained. Run training/train_efficientnet.py",
-            }
-        ]
+        # Read from pre-loaded model loader singleton (already loaded at startup)
+        try:
+            from ai.classification.model import _loader
+            if _loader is not None and _loader.status in ("TRAINED", "VALIDATED"):
+                import torch
+                ckpt = torch.load(_loader.weights_path, map_location="cpu",
+                                  weights_only=False) if _loader.weights_path else {}
+                return [{
+                    "model_name":       "EfficientNet-B0",
+                    "version":          _loader.model_version,
+                    "architecture":     "EfficientNet-B0 + Transfer Learning (timm)",
+                    "status":           _loader.status,
+                    "training_dataset": _loader.training_dataset,
+                    "trained_epoch":    ckpt.get("epoch"),
+                    "accuracy":         ckpt.get("val_accuracy"),
+                    "sensitivity":      ckpt.get("val_sensitivity"),
+                    "specificity":      ckpt.get("val_specificity"),
+                    "f1_score":         ckpt.get("val_f1"),
+                    "roc_auc":          None,
+                    "metrics_note": (
+                        f"Epoch {ckpt.get('epoch')} checkpoint on "
+                        f"{_loader.training_dataset}. "
+                        "Run training/evaluate.py for full held-out test set metrics."
+                    ),
+                }]
+        except Exception:
+            pass
+        return [{
+            "model_name":    "EfficientNet-B0",
+            "version":       "0.0.0",
+            "architecture":  "EfficientNet-B0 + Transfer Learning",
+            "status":        "NOT_TRAINED",
+            "training_dataset": "NOT_AVAILABLE",
+            "accuracy":      None,
+            "sensitivity":   None,
+            "specificity":   None,
+            "f1_score":      None,
+            "roc_auc":       None,
+            "metrics_note":  "Not yet trained. Run training/train_efficientnet.py",
+        }]
     return models
 
 

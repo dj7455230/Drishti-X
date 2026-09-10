@@ -208,12 +208,21 @@ async def analyze_screening(
             detail="Image file not found on disk. Please re-upload."
         )
 
-    # Run pipeline
-    from ai.inference.inference_service import get_inference_service
+    # Run pipeline — always resolve weights path fresh
+    from ai.inference.inference_service import InferenceService
+    import ai.inference.inference_service as _inf_mod
+
     weights_path = os.path.join(settings.MODEL_DIR, "best_model.pth")
-    service = get_inference_service(
-        weights_path=weights_path if os.path.exists(weights_path) else None
-    )
+    wp = weights_path if os.path.exists(weights_path) else None
+
+    # Reset singleton if model became available since last startup
+    if (_inf_mod._service is not None and
+            not _inf_mod._service.loader.is_ready_for_real_inference() and
+            wp is not None):
+        _inf_mod._service = None
+
+    from ai.inference.inference_service import get_inference_service
+    service = get_inference_service(weights_path=wp)
 
     save_dir = os.path.join(UPLOAD_DIR, str(screening_id))
     result = service.run_full_pipeline(

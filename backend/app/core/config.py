@@ -2,14 +2,19 @@
 DRISHTI-X — Core Configuration
 Loads from environment variables / .env file.
 """
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 from typing import List
 import os
 
 
 class Settings(BaseSettings):
-    # Application
+    model_config = SettingsConfigDict(
+        env_file=["backend/.env", ".env"],
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
     APP_NAME: str = "DRISHTI-X"
     APP_VERSION: str = "0.1.0"
     APP_ENV: str = "development"          # development | production | demo
@@ -51,9 +56,7 @@ class Settings(BaseSettings):
     # Referral
     REFERABLE_GRADES: List[int] = [2, 3, 4]  # Grade 2+ = Referable DR
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    # Application
 
 
 settings = Settings()

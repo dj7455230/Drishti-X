@@ -45,13 +45,13 @@ def compute_binary_metrics(
     f1 = 2 * precision * sensitivity / (precision + sensitivity + 1e-8)
 
     result = {
-        "sensitivity": round(sensitivity, 4),
-        "specificity": round(specificity, 4),
-        "precision": round(precision, 4),
-        "f1_referable": round(f1, 4),
+        "sensitivity": round(float(sensitivity), 4),
+        "specificity": round(float(specificity), 4),
+        "precision":   round(float(precision), 4),
+        "f1_referable":round(float(f1), 4),
         "tp": int(tp), "tn": int(tn), "fp": int(fp), "fn": int(fn),
-        "sensitivity_target_met": sensitivity >= SENSITIVITY_TARGET,
-        "specificity_target_met": specificity >= SPECIFICITY_TARGET,
+        "sensitivity_target_met": bool(sensitivity >= SENSITIVITY_TARGET),
+        "specificity_target_met": bool(specificity >= SPECIFICITY_TARGET),
         "sensitivity_note": (
             f"TARGET MET ({sensitivity:.1%} >= {SENSITIVITY_TARGET:.0%})"
             if sensitivity >= SENSITIVITY_TARGET

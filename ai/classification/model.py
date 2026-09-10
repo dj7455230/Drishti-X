@@ -120,8 +120,10 @@ class ModelLoader:
     def load(self) -> "ModelLoader":
         """
         Attempt to load trained weights. If unavailable, model stays NOT_TRAINED.
+        Always uses weights_only=False for our own checkpoint files.
         """
-        # Build architecture (always available — uses ImageNet pretrained weights for features)
+        import os
+        # Build architecture with ImageNet pretrained features
         self.model = DrishtiEfficientNet(pretrained=True)
         self.model.eval()
 
@@ -130,28 +132,29 @@ class ModelLoader:
                 checkpoint = torch.load(
                     self.weights_path,
                     map_location=self.device,
-                    weights_only=True
+                    weights_only=False      # our own checkpoint — safe
                 )
                 # Handle both raw state_dict and checkpoint dict
                 state_dict = checkpoint.get("model_state_dict", checkpoint)
                 self.model.load_state_dict(state_dict)
                 self.model.to(self.device)
+                self.model.eval()
                 self.status = checkpoint.get("status", "TRAINED")
                 self.model_version = checkpoint.get("version", "1.0.0")
                 self.training_dataset = checkpoint.get("training_dataset", "unknown")
                 # Compute hash of weights file for audit trail
                 with open(self.weights_path, "rb") as f:
                     self.weights_hash = hashlib.sha256(f.read()).hexdigest()
-                print(f"[ModelLoader] Loaded weights: {self.weights_path}")
+                print(f"[ModelLoader] Loaded: {self.weights_path}")
                 print(f"[ModelLoader] Status: {self.status} | Version: {self.model_version}")
+                print(f"[ModelLoader] Sensitivity: {checkpoint.get('val_sensitivity','N/A')}  Specificity: {checkpoint.get('val_specificity','N/A')}")
             except Exception as e:
                 print(f"[ModelLoader] WARNING: Could not load weights: {e}")
-                print("[ModelLoader] Status: NOT_TRAINED")
                 self.status = "NOT_TRAINED"
         else:
             if self.weights_path:
                 print(f"[ModelLoader] Weights not found at: {self.weights_path}")
-            print(f"[ModelLoader] Status: NOT_TRAINED — architecture ready, no trained weights.")
+            print(f"[ModelLoader] Status: NOT_TRAINED — no trained weights found.")
             self.status = "NOT_TRAINED"
 
         return self
@@ -170,5 +173,10 @@ _loader: Optional[ModelLoader] = None
 def get_model_loader(weights_path: Optional[str] = None) -> ModelLoader:
     global _loader
     if _loader is None:
+        _loader = ModelLoader(weights_path=weights_path).load()
+    elif (weights_path is not None
+          and not _loader.is_ready_for_real_inference()
+          and os.path.exists(weights_path)):
+        # Weights became available — reload
         _loader = ModelLoader(weights_path=weights_path).load()
     return _loader
