@@ -27,9 +27,9 @@ class UserOut(BaseModel):
     full_name: str
     role: UserRole
     is_active: bool
-    facility_name: Optional[str]
-    facility_location: Optional[str]
-    created_at: datetime
+    facility_name: Optional[str] = None
+    facility_location: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

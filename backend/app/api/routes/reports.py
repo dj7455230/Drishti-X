@@ -50,6 +50,15 @@ def create_report(
         output_dir="reports",
     )
 
+    # Generate PDF
+    pdf_path = f"reports/report_{screening_id}.pdf"
+    try:
+        from app.services.pdf_report_service import generate_pdf_report
+        generate_pdf_report(report_data, pdf_path)
+        report_data["pdf_path"] = pdf_path
+    except Exception as e:
+        report_data["pdf_warning"] = f"PDF generation failed: {str(e)}"
+
     # Upsert Report record
     report = db.query(Report).filter(Report.screening_id == screening_id).first()
     if not report:
@@ -91,6 +100,27 @@ def get_report(
             detail="No report found. Generate one with POST /api/screenings/{id}/report"
         )
     return JSONResponse(content=report.summary or {})
+
+
+@router.get("/screenings/{screening_id}/report/pdf")
+def download_report_pdf(
+    screening_id: uuid.UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Download the PDF report file."""
+    from fastapi.responses import FileResponse
+    pdf_path = f"reports/report_{screening_id}.pdf"
+    if not os.path.exists(pdf_path):
+        raise HTTPException(
+            status_code=404,
+            detail="PDF not found. Generate it first via POST /api/screenings/{id}/report"
+        )
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename=f"DRISHTI-X_Report_{str(screening_id)[:8]}.pdf"
+    )
 
 
 @router.get("/reports")

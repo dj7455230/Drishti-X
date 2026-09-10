@@ -20,6 +20,10 @@ from app.api.deps import get_current_user, require_admin
 
 router = APIRouter(prefix="/api", tags=["Dashboard"])
 
+# Dataset paths — resolved relative to project root (one level above backend/)
+import pathlib
+_PROJECT_ROOT = pathlib.Path(__file__).parent.parent.parent.parent.parent
+
 
 @router.get("/dashboard/statistics")
 def get_statistics(
@@ -165,3 +169,162 @@ def get_audit_logs(
         }
         for log in logs
     ]
+
+
+# ----------------------------------------------------------------
+# DATASETS STATUS
+# ----------------------------------------------------------------
+@router.get("/datasets")
+def get_datasets_status(
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Returns status and statistics for all connected datasets.
+    Paths resolved relative to the project root.
+    """
+    import os, glob
+    import pandas as pd
+
+    root = _PROJECT_ROOT
+
+    def _count_files(path, pattern="*"):
+        d = root / path
+        if not d.exists():
+            return 0, False
+        return len(glob.glob(str(d / pattern))), True
+
+    # ── APTOS 2019 ──────────────────────────────────────────
+    aptos_train_csv = root / "datasets/aptos2019/train.csv"
+    aptos_test_csv  = root / "datasets/aptos2019/test.csv"
+    aptos_train_imgs, aptos_ok = _count_files("datasets/aptos2019/train_images", "*.png")
+    aptos_test_imgs, _         = _count_files("datasets/aptos2019/test_images",  "*.png")
+    aptos_grade_dist = {}
+    if aptos_train_csv.exists():
+        df = pd.read_csv(aptos_train_csv)
+        aptos_grade_dist = df["diagnosis"].value_counts().sort_index().to_dict()
+        aptos_grade_dist = {int(k): int(v) for k, v in aptos_grade_dist.items()}
+
+    # ── IDRiD Disease Grading ───────────────────────────────
+    idrid_grading_dir = root / "datasets/idrid/B. Disease Grading"
+    idrid_train_csv   = idrid_grading_dir / "2. a. IDRiD_Disease Grading_Training Labels.csv"
+    idrid_test_csv    = idrid_grading_dir / "2. b. IDRiD_Disease Grading_Testing Labels.csv"
+    idrid_train_imgs, _ = _count_files("datasets/idrid/B. Disease Grading/1. Original Images/a. Training Set", "*.jpg")
+    idrid_test_imgs, _  = _count_files("datasets/idrid/B. Disease Grading/1. Original Images/b. Testing Set",  "*.jpg")
+    idrid_grade_dist = {}
+    if idrid_train_csv.exists():
+        try:
+            df = pd.read_csv(idrid_train_csv)
+            col = [c for c in df.columns if "Retinopathy" in c or "grade" in c.lower()][0]
+            idrid_grade_dist = df[col].value_counts().sort_index().to_dict()
+            idrid_grade_dist = {int(k): int(v) for k, v in idrid_grade_dist.items()}
+        except Exception:
+            pass
+
+    # ── IDRiD Segmentation ──────────────────────────────────
+    idrid_seg_train, _ = _count_files(
+        "datasets/idrid/A. Segmentation/1. Original Images/a. Training Set", "*.jpg"
+    )
+    idrid_seg_test, _  = _count_files(
+        "datasets/idrid/A. Segmentation/1. Original Images/b. Testing Set",  "*.jpg"
+    )
+    idrid_seg_masks_ma, _ = _count_files(
+        "datasets/idrid/A. Segmentation/2. All Segmentation Groundtruths/a. Training Set/1. Microaneurysms",
+        "*.tif"
+    )
+
+    # ── Messidor-2 ──────────────────────────────────────────
+    messidor_csv = root / "datasets/messidor2/archive/messidor_data.csv"
+    messidor_imgs, _ = _count_files(
+        "datasets/messidor2/archive/messidor-2/messidor-2/preprocess", "*"
+    )
+    messidor_grade_dist = {}
+    messidor_gradable   = 0
+    if messidor_csv.exists():
+        df = pd.read_csv(messidor_csv)
+        messidor_gradable   = int(df["adjudicated_gradable"].sum())
+        messidor_grade_dist = df["diagnosis"].value_counts().sort_index().to_dict()
+        messidor_grade_dist = {int(k): int(v) for k, v in messidor_grade_dist.items()}
+
+    # ── DRIVE ───────────────────────────────────────────────
+    drive_train_imgs,    _ = _count_files("datasets/drive/DRIVE/training/images",    "*.tif")
+    drive_train_masks,   _ = _count_files("datasets/drive/DRIVE/training/1st_manual","*.gif")
+    drive_test_imgs,     _ = _count_files("datasets/drive/DRIVE/test/images",        "*.tif")
+
+    # ── Combined training split CSVs ────────────────────────
+    combined_csv  = root / "datasets/combined_train.csv"
+    train_csv     = root / "datasets/train_split.csv"
+    val_csv       = root / "datasets/val_split.csv"
+    test_csv      = root / "datasets/test_split.csv"
+    combined_n    = len(pd.read_csv(combined_csv)) if combined_csv.exists() else 0
+    train_n       = len(pd.read_csv(train_csv))    if train_csv.exists()    else 0
+    val_n         = len(pd.read_csv(val_csv))      if val_csv.exists()      else 0
+    test_n        = len(pd.read_csv(test_csv))     if test_csv.exists()     else 0
+
+    return {
+        "disclaimer": "AI-ASSISTED SCREENING — NOT A FINAL MEDICAL DIAGNOSIS",
+        "datasets": {
+            "aptos2019": {
+                "name":           "APTOS 2019 Blindness Detection",
+                "available":      aptos_ok,
+                "train_images":   aptos_train_imgs,
+                "test_images":    aptos_test_imgs,
+                "grade_distribution": aptos_grade_dist,
+                "use":            "DR Classification Training",
+                "path":           "datasets/aptos2019/",
+            },
+            "idrid_grading": {
+                "name":           "IDRiD Disease Grading",
+                "available":      idrid_train_imgs > 0,
+                "train_images":   idrid_train_imgs,
+                "test_images":    idrid_test_imgs,
+                "grade_distribution": idrid_grade_dist,
+                "use":            "DR Classification Training",
+                "path":           "datasets/idrid/B. Disease Grading/",
+            },
+            "idrid_segmentation": {
+                "name":           "IDRiD Lesion Segmentation",
+                "available":      idrid_seg_train > 0,
+                "train_images":   idrid_seg_train,
+                "test_images":    idrid_seg_test,
+                "mask_types":     ["Microaneurysms", "Haemorrhages", "Hard Exudates",
+                                   "Soft Exudates", "Optic Disc"],
+                "train_masks_ma": idrid_seg_masks_ma,
+                "use":            "U-Net Lesion Segmentation Training",
+                "unet_status":    "TRAINED",
+                "path":           "datasets/idrid/A. Segmentation/",
+            },
+            "messidor2": {
+                "name":           "Messidor-2",
+                "available":      messidor_imgs > 0,
+                "total_images":   messidor_imgs,
+                "gradable_images":messidor_gradable,
+                "grade_distribution": messidor_grade_dist,
+                "use":            "External Evaluation Only",
+                "note":           "NOT used for training. External test set only.",
+                "path":           "datasets/messidor2/",
+            },
+            "drive": {
+                "name":           "DRIVE (Digital Retinal Images for Vessel Extraction)",
+                "available":      drive_train_imgs > 0,
+                "train_images":   drive_train_imgs,
+                "train_masks":    drive_train_masks,
+                "test_images":    drive_test_imgs,
+                "use":            "Retinal Vessel Segmentation",
+                "note":           "Separate vessel segmentation pipeline. NOT used for DR classification.",
+                "path":           "datasets/drive/DRIVE/",
+            },
+        },
+        "training_splits": {
+            "combined_train_csv":  str(combined_csv.name) if combined_csv.exists() else None,
+            "combined_n":          combined_n,
+            "train_n":             train_n,
+            "val_n":               val_n,
+            "test_n":              test_n,
+            "note":                "train+val from APTOS2019+IDRiD. test_split = held-out 462 images.",
+        },
+        "model_checkpoints": {
+            "efficientnet_b0":  os.path.exists(str(root / "models/weights/best_model.pth")),
+            "unet_lesion":      os.path.exists(str(root / "models/weights/unet_lesion.pth")),
+            "temperature_json": os.path.exists(str(root / "models/weights/temperature.json")),
+        },
+    }
