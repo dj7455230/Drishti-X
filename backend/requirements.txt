@@ -29,8 +29,8 @@ httpx==0.28.1
 # ── ML / AI ────────────────────────────────────────────────────
 # NOTE: torch and torchvision are large (~800MB). Render free tier may
 # time out on install. Use a paid plan or pre-built Docker image.
-torch==2.5.1
-torchvision==0.20.1
+torch>=2.0.0
+torchvision>=0.15.0
 timm==1.0.12
 
 # ── Computer Vision ────────────────────────────────────────────
