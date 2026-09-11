@@ -40,6 +40,8 @@ def create_report(
     prediction = db.query(Prediction).filter(Prediction.screening_id == screening_id).first()
     review     = db.query(DoctorReview).filter(DoctorReview.screening_id == screening_id).first()
 
+    from app.core.config import settings
+
     report_data = generate_report(
         screening=screening,
         patient=patient,
@@ -47,11 +49,12 @@ def create_report(
         prediction=prediction,
         doctor_review=review,
         generated_by_user_id=str(current_user.id),
-        output_dir="reports",
+        output_dir=settings.REPORTS_DIR,
     )
 
     # Generate PDF
-    pdf_path = f"reports/report_{screening_id}.pdf"
+    os.makedirs(settings.REPORTS_DIR, exist_ok=True)
+    pdf_path = os.path.join(settings.REPORTS_DIR, f"report_{screening_id}.pdf")
     try:
         from app.services.pdf_report_service import generate_pdf_report
         generate_pdf_report(report_data, pdf_path)
@@ -66,7 +69,7 @@ def create_report(
         db.add(report)
 
     report.report_path = report_data.get("report_path",
-        f"reports/report_{screening_id}.json")
+        os.path.join(settings.REPORTS_DIR, f"report_{screening_id}.json"))
     report.report_format = "JSON"
     report.summary = report_data
     report.generated_by = current_user.id
@@ -110,7 +113,8 @@ def download_report_pdf(
 ):
     """Download the PDF report file."""
     from fastapi.responses import FileResponse
-    pdf_path = f"reports/report_{screening_id}.pdf"
+    from app.core.config import settings
+    pdf_path = os.path.join(settings.REPORTS_DIR, f"report_{screening_id}.pdf")
     if not os.path.exists(pdf_path):
         raise HTTPException(
             status_code=404,

@@ -6,11 +6,17 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
+# Render PostgreSQL requires SSL. If DATABASE_URL starts with postgres://
+# SQLAlchemy 1.4+ requires postgresql://. Fix that automatically.
+_db_url = settings.DATABASE_URL
+if _db_url.startswith("postgres://"):
+    _db_url = _db_url.replace("postgres://", "postgresql://", 1)
+
 engine = create_engine(
-    settings.DATABASE_URL,
+    _db_url,
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=5,
+    max_overflow=10,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

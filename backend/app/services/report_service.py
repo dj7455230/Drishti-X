@@ -48,7 +48,7 @@ def generate_report(
     prediction,
     doctor_review,
     generated_by_user_id: Optional[str] = None,
-    output_dir: str = "reports",
+    output_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Generate a structured screening report dict.
@@ -56,6 +56,9 @@ def generate_report(
 
     Returns the report dict.
     """
+    if output_dir is None:
+        from app.core.config import settings
+        output_dir = settings.REPORTS_DIR
     os.makedirs(output_dir, exist_ok=True)
     timestamp = datetime.now(timezone.utc).isoformat()
 

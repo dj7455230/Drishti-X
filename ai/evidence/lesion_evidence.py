@@ -13,7 +13,14 @@ import os
 
 CV_PROVENANCE   = "CV_PIPELINE_HEURISTIC"
 UNET_PROVENANCE = "UNET_SEGMENTATION"
-UNET_WEIGHTS    = "models/weights/unet_lesion.pth"
+
+# Resolve U-Net weights path from config or environment
+def _get_unet_weights_path() -> str:
+    try:
+        from app.core.config import settings
+        return os.path.join(settings.model_weights_path, "unet_lesion.pth")
+    except Exception:
+        return os.environ.get("MODEL_DIR", "models/weights") + "/unet_lesion.pth"
 
 # Class indices in U-Net output
 UNET_CLASSES = {0: "background", 1: "microaneurysm", 2: "hemorrhage", 3: "hard_exudate"}
@@ -26,6 +33,7 @@ def _try_unet_inference(image_path: str) -> Optional[Dict[str, Any]]:
     Attempt U-Net lesion segmentation if weights are available.
     Returns structured lesion dict or None if unavailable.
     """
+    UNET_WEIGHTS = _get_unet_weights_path()
     if not os.path.exists(UNET_WEIGHTS):
         return None
 

@@ -212,7 +212,7 @@ async def analyze_screening(
     from ai.inference.inference_service import InferenceService
     import ai.inference.inference_service as _inf_mod
 
-    weights_path = os.path.join(settings.MODEL_DIR, "best_model.pth")
+    weights_path = os.path.join(settings.model_weights_path, "best_model.pth")
     wp = weights_path if os.path.exists(weights_path) else None
 
     # Reset singleton if model became available since last startup

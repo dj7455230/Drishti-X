@@ -21,12 +21,13 @@ async def lifespan(app: FastAPI):
     # Create all tables on startup (use Alembic migrations in production)
     Base.metadata.create_all(bind=engine)
 
-    # Ensure upload directory exists
+    # Ensure upload/reports directories exist (works for both /tmp and local paths)
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    os.makedirs(settings.MODEL_DIR, exist_ok=True)
+    os.makedirs(settings.REPORTS_DIR, exist_ok=True)
+    os.makedirs(settings.model_weights_path, exist_ok=True)
 
     # Pre-load model at startup so health endpoint is accurate immediately
-    weights_path = os.path.join(settings.MODEL_DIR, "best_model.pth")
+    weights_path = os.path.join(settings.model_weights_path, "best_model.pth")
     try:
         from ai.classification.model import get_model_loader
         loader = get_model_loader(
@@ -72,11 +73,23 @@ app = FastAPI(
 )
 
 # ----------------------------------------------------------------
-# CORS
+# CORS — configurable via FRONTEND_URL environment variable
+# Production: set FRONTEND_URL=https://your-frontend.vercel.app
 # ----------------------------------------------------------------
+allowed_origins = [
+    settings.FRONTEND_URL,
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+# Also allow any additional comma-separated origins in FRONTEND_URL
+if "," in settings.FRONTEND_URL:
+    allowed_origins = [
+        o.strip() for o in settings.FRONTEND_URL.split(",")
+    ] + ["http://localhost:3000", "http://127.0.0.1:3000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=list(set(allowed_origins)),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -84,6 +97,7 @@ app.add_middleware(
 
 # ----------------------------------------------------------------
 # Static Files (uploaded images, Grad-CAMs, etc.)
+# Directory is created at startup in lifespan; also ensure here.
 # ----------------------------------------------------------------
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
@@ -99,13 +113,19 @@ app.include_router(simulation.router)
 app.include_router(reports.router)
 
 
+@app.get("/health")
+def root_health():
+    """Render health check endpoint — fast, no DB query."""
+    return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
+
+
 @app.get("/api/health")
 def health_check():
     """Live health check — reads actual model loader status."""
     import os
 
-    weights_path      = os.path.join(settings.MODEL_DIR, "best_model.pth")
-    unet_weights_path = os.path.join(settings.MODEL_DIR, "unet_lesion.pth")
+    weights_path      = os.path.join(settings.model_weights_path, "best_model.pth")
+    unet_weights_path = os.path.join(settings.model_weights_path, "unet_lesion.pth")
     weights_exist      = os.path.exists(weights_path)
     unet_weights_exist = os.path.exists(unet_weights_path)
 

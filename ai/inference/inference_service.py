@@ -37,12 +37,17 @@ class InferenceService:
         self.device = self.loader.device
 
         # Load calibration if available
-        import os
         # Resolve calibration path alongside weights
         if weights_path:
             calibration_path = os.path.join(os.path.dirname(weights_path), "temperature.json")
         else:
-            calibration_path = "models/weights/temperature.json"
+            try:
+                from app.core.config import settings
+                calibration_path = os.path.join(settings.model_weights_path, "temperature.json")
+            except Exception:
+                calibration_path = os.path.join(
+                    os.environ.get("MODEL_DIR", "models/weights"), "temperature.json"
+                )
         self.calibrator = TemperatureScaler.load_or_default(calibration_path)
         if self.calibrator._fitted and self.calibrator.temperature != 1.0:
             print(f"[InferenceService] Calibration loaded: T={self.calibrator.temperature:.4f}")
