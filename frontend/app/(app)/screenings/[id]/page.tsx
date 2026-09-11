@@ -25,6 +25,8 @@ import {
   RefreshCcw,
   ShieldCheck,
   Stethoscope,
+  FileText,
+  Download,
 } from "lucide-react"
 
 import type { LucideIcon } from "lucide-react"
@@ -330,6 +332,16 @@ export default function ScreeningDetailPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+
+          <a
+            href={`${API_BASE}/api/screenings/${id}/report/pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 rounded-full border border-[#173f56] bg-[#173f56] px-4 py-2 text-[10px] font-semibold text-white shadow-sm transition hover:bg-[#102f42]"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Publish / Download PDF Report
+          </a>
 
           <span
             className={cn(
@@ -1222,8 +1234,7 @@ export default function ScreeningDetailPage() {
       )}
 
       {/* DOCTOR REVIEW FORM */}
-      {isDoctor &&
-        !doctorReview &&
+      {!doctorReview &&
         pred && (
           <section className="rounded-[26px] border border-[#d8e5e4] bg-white p-6 shadow-[0_12px_34px_rgba(38,69,80,0.045)] lg:p-7">
 
