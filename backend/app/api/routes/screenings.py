@@ -446,7 +446,29 @@ def request_recapture(
 ):
     screening = _get_screening_or_404(screening_id, db)
     screening.status = ScreeningStatus.RECAPTURE_REQUIRED
+    screening.assurance_decision = AssuranceDecision.RECAPTURE_REQUIRED
+    screening.assurance_reasons = [reason, "Image quality or clinical review required new capture."]
+
+    # Record or update DoctorReview if review exists
+    review = db.query(DoctorReview).filter(
+        DoctorReview.screening_id == screening_id
+    ).first()
+    if not review:
+        review = DoctorReview(
+            screening_id=screening_id,
+            reviewer_id=current_user.id,
+        )
+        db.add(review)
+
+    review.recapture_requested = True
+    review.recapture_reason = reason
+
     _audit(db, current_user.id, screening_id, "RECAPTURE_REQUESTED",
            detail=reason)
     db.commit()
-    return {"screening_id": str(screening_id), "status": "RECAPTURE_REQUIRED"}
+    return {
+        "screening_id": str(screening_id),
+        "status": "RECAPTURE_REQUIRED",
+        "assurance_decision": "RECAPTURE_REQUIRED",
+        "reason": reason,
+    }
