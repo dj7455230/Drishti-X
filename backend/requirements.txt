@@ -46,7 +46,6 @@ reportlab==4.2.5
 
 # ── Utilities ──────────────────────────────────────────────────
 python-dotenv==1.0.1
-scipy==1.14.1
 
 # ── Testing (kept for CI but not loaded in production) ─────────
 pytest==8.3.3
