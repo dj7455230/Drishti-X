@@ -251,17 +251,6 @@ export default function ScreeningDetailPage() {
   const assurance =
     report.assurance || {}
 
-  const recommendation =
-    report.recommendation || {}
-    const displayRecommendation =
-  pred?.is_demo || !hasPrediction
-    ? {
-        clinical_pathway: "HUMAN_REVIEW_REQUIRED",
-        action:
-          "Ophthalmologist review is required before assigning a referral timeline or treatment pathway.",
-      }
-    : recommendation
-
   const doctorReview =
     report.doctor_review || null
 
@@ -274,6 +263,15 @@ export default function ScreeningDetailPage() {
   const hasPrediction =
     predictedGrade !== null &&
     predictedGrade !== undefined
+
+  const displayRecommendation =
+    pred?.is_demo || !hasPrediction
+      ? {
+          clinical_pathway: "HUMAN_REVIEW_REQUIRED",
+          action:
+            "Ophthalmologist review is required before assigning a referral timeline or treatment pathway.",
+        }
+      : recommendation
 
   const assuranceStyle =
     getAssuranceConfig(
