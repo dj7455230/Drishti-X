@@ -264,6 +264,9 @@ export default function ScreeningDetailPage() {
     predictedGrade !== null &&
     predictedGrade !== undefined
 
+  const recommendation =
+    report.recommendation || {}
+
   const displayRecommendation =
     pred?.is_demo || !hasPrediction
       ? {

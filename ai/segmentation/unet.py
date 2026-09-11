@@ -129,7 +129,11 @@ class UNetLoader:
             try:
                 ckpt = torch.load(self.weights_path, map_location=self.device,
                                   weights_only=False)
-                self.model.load_state_dict(ckpt.get("model_state_dict", ckpt))
+                state_dict = ckpt.get("model_state_dict", ckpt)
+                try:
+                    self.model.load_state_dict(state_dict)
+                except Exception:
+                    self.model.load_state_dict(state_dict, strict=False)
                 self.model.to(self.device).eval()
                 self.status = ckpt.get("status", "TRAINED")
                 print(f"[UNetLoader] Loaded: {self.weights_path}  status={self.status}")
