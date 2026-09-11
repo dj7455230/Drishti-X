@@ -150,12 +150,12 @@ class InferenceService:
             with torch.no_grad():
                 logits = self.loader.model(tensor)
 
-            # Apply temperature calibration & medical confidence capping (max 99.5%)
+            # Apply temperature calibration & medical confidence capping (max 91.5%)
             probs = self.calibrator.calibrate(logits)[0].cpu().numpy()
             predicted_grade = int(np.argmax(probs))
             
-            # Cap maximum probability at 0.995 for realistic clinical AI confidence
-            MAX_CAP = 0.995
+            # Cap maximum probability at 0.915 for realistic clinical AI confidence
+            MAX_CAP = 0.915
             if probs[predicted_grade] > MAX_CAP:
                 diff = probs[predicted_grade] - MAX_CAP
                 probs[predicted_grade] = MAX_CAP
