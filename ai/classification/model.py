@@ -136,7 +136,27 @@ class ModelLoader:
                 )
                 # Handle both raw state_dict and checkpoint dict
                 state_dict = checkpoint.get("model_state_dict", checkpoint)
-                self.model.load_state_dict(state_dict)
+                try:
+                    self.model.load_state_dict(state_dict)
+                except Exception:
+                    # Fallback if state_dict matches torchvision EfficientNet-B0
+                    from torchvision.models import efficientnet_b0
+                    class TorchvisionWrapper(nn.Module):
+                        def __init__(self, num_classes=5):
+                            super().__init__()
+                            self.backbone = efficientnet_b0(num_classes=num_classes)
+                        def forward(self, x):
+                            return self.backbone(x)
+                        def get_feature_map(self, x):
+                            features = x
+                            for layer in list(self.backbone.features.children()):
+                                features = layer(features)
+                            return features
+
+                    fallback_model = TorchvisionWrapper(num_classes=5)
+                    fallback_model.load_state_dict(state_dict)
+                    self.model = fallback_model
+
                 self.model.to(self.device)
                 self.model.eval()
                 self.status = checkpoint.get("status", "TRAINED")
